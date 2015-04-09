@@ -12,6 +12,10 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.params.CoreProtocolPNames;
 
 
+import android.app.NotificationManager;
+import android.content.Context;
+import android.support.v4.app.NotificationCompat;
+import android.support.v4.app.NotificationCompat.Builder;
 import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
@@ -24,6 +28,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.support.v7.app.ActionBarActivity;
+import android.util.Log;
 import android.view.Menu;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -38,6 +43,10 @@ public class MainActivity extends ActionBarActivity {
     private String foto;
     private static int TAKE_PICTURE = 1;
     double aleatorio = 0;
+
+    private NotificationManager mNotifyManager;
+    private Builder mBuilder;
+    int id = 1;
 
     MetodosCamara metodos = new MetodosCamara();
 
@@ -70,6 +79,12 @@ public class MainActivity extends ActionBarActivity {
 				 * Lanzamos el intenta y recogemos el resultado en onActivityResult
 				 */
                 startActivityForResult(intent, TAKE_PICTURE); // 1 para la camara, 2 para la galeria
+
+                mNotifyManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                mBuilder = new NotificationCompat.Builder(MainActivity.this);
+                mBuilder.setContentTitle("Cargando")
+                        .setContentText("Carga en progreso")
+                        .setSmallIcon(R.drawable.abc_list_focused_holo);
             }
         });
         btnHora = (Button) findViewById(R.id.mostrarHora);
@@ -109,7 +124,7 @@ public class MainActivity extends ActionBarActivity {
     /*
 	 * Clase asincrona para subir la foto
 	 */
-    class UploaderFoto extends AsyncTask<String, Void, Void>{
+    class UploaderFoto extends AsyncTask<String, Integer, Void>{
 
         ProgressDialog pDialog;
         String miFoto = "";
@@ -118,6 +133,19 @@ public class MainActivity extends ActionBarActivity {
         protected Void doInBackground(String... params) {
             miFoto = params[0];
             try {
+
+                int i;
+                for (i = 0; i <= 100; i += 5) {
+                    // Sets the progress indicator completion percentage
+                    publishProgress(Math.min(i, 100));
+                    try {
+                        // Sleep for 5 seconds
+                        Thread.sleep(2 * 1000);
+                    } catch (InterruptedException e) {
+                        Log.d("TAG", "sleep failure");
+                    }
+                }
+
                 HttpClient httpclient = new DefaultHttpClient();
                 httpclient.getParams().setParameter(CoreProtocolPNames.PROTOCOL_VERSION, HttpVersion.HTTP_1_1);
                 HttpPost httppost = new HttpPost("http://camara.lerolero.cl/uploads/up.php");
@@ -133,9 +161,21 @@ public class MainActivity extends ActionBarActivity {
             }
             return null;
         }
+        @Override
+        protected void onProgressUpdate(Integer... values) {
+            // Update progress
+            mBuilder.setProgress(100, values[0], false);
+            mNotifyManager.notify(id, mBuilder.build());
+            super.onProgressUpdate(values);
+        }
 
         protected void onPreExecute() {
             super.onPreExecute();
+
+            // Displays the progress bar for the first time.
+            mBuilder.setProgress(100, 0, false);
+            mNotifyManager.notify(id, mBuilder.build());
+
             pDialog = new ProgressDialog(MainActivity.this);
             pDialog.setMessage("Subiendo la imagen, espere." );
             pDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
@@ -145,6 +185,11 @@ public class MainActivity extends ActionBarActivity {
         protected void onPostExecute(Void result) {
             super.onPostExecute(result);
             pDialog.dismiss();
+
+            mBuilder.setContentText("Carga completada");
+            // Removes the progress bar
+            mBuilder.setProgress(0, 0, false);
+            mNotifyManager.notify(id, mBuilder.build());
         }
     }
 }
